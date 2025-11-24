@@ -1,2 +1,619 @@
 % Placeholder content for Chapter 2.
-\lipsum[2]
+% \lipsum[2]
+\chapter{Literature Review}
+
+\noindent
+This chapter reviews the foundations and recent advances in object detection with a focus on Vision Transformer (ViT)–based architectures and Detection Transformers (DETR). The aim is to provide the conceptual and technical background necessary to situate the contributions of this thesis within the broader landscape of modern detection research. The chapter begins by outlining the evolution of object detection, from classical feature-driven methods to deep learning–based CNN detectors, highlighting their core assumptions and limitations. It then introduces Vision Transformers and their representational properties, establishing the motivation for transformer-based detection frameworks.
+
+A substantial portion of the chapter examines DETR and its derivatives, tracing the architectural innovations that address DETR’s well-known challenges in convergence, multi-scale reasoning, and small-object performance. The discussion extends to multi-scale modelling strategies, ViT-based DETR variants, and emerging pure-ViT detection pipelines. In parallel, the chapter surveys explainability methods for transformers, noting the scarcity of interpretability studies for DETR and the implications this has for analysing model behaviour. The chapter concludes by synthesising the key gaps in the literature, including inefficient feature utilisation, limited multi-scale fusion, and weak interpretability. It then explains how the subsequent chapters of this thesis address these issues and how the proposed contributions respond directly to the limitations identified in the reviewed work.
+
+
+% \section{Foundations of Object Detection}
+% This section will introduce the evolution of object detection, beginning with classical feature-based approaches such as HOG and DPM, and transitioning into deep learning–based detectors. Describe the distinction between two-stage detectors (e.g., R-CNN, Fast R-CNN, Faster R-CNN) and one-stage detectors (e.g., YOLO, SSD), explaining their architectural differences and trade-offs. Conclude with the core limitations of CNN-based detectors, particularly in modelling global context and handling small or subtle objects.
+
+\section{Foundations of Object Detection}
+Object detection aims to localise and categorise multiple object instances within an image, typically via bounding boxes and class labels. Unlike image classification, detection requires both semantic recognition and precise spatial reasoning under variations in scale, clutter, and occlusion. The evolution of object detection is commonly described through three interacting strands: (i) handcrafted feature based detectors, (ii) convolutional neural network (CNN) based two-stage and one-stage detectors, and (iii) attention and transformer-centric detection frameworks. This section reviews these foundations to motivate later discussion on DETR style models and small object performance.
+
+\subsection{Object Detection with handcrafted features}
+Early detectors treated detection as a sliding-window classification problem, relying on engineered features and exhaustive search across locations and scales. Although computationally expensive, this paradigm produced several influential ideas that reappear in modern detectors.
+
+\subsubsection{Viola-Jones and cascade detection}
+The Viola-Jones framework introduced real-time face detection using Haar-like features and an integral image representation \cite{viola2001rapid}. The integral image enables constant-time computation of rectangular feature sums, making dense multi-scale scanning tractable. A second key contribution is the attentional cascade: a sequence of increasingly complex classifiers that reject easy negatives early, thereby reducing average computation. Conceptually, this rejection-first strategy foreshadows modern proposal filtering stages.
+
+\subsubsection{Histogram of Oriented Gradients}
+Dalal and Triggs proposed the Histogram of Oriented Gradients (HOG) descriptor \cite{dalal2005hog}, which models local object shape by aggregating gradient orientation statistics within spatial cells, followed by block-level contrast normalisation. Linear SVMs on HOG features established strong baselines for pedestrian detection, but the rigidity of fixed templates limited robustness to large pose variation and non-rigid deformations.
+
+\subsubsection{Deformable Part Models}
+Deformable Part Models (DPMs) extended HOG with explicit part-based representations and latent-variable training \cite{felzenszwalb2010dpm}. Objects are modelled as a root filter plus a set of higher resolution part filters whose locations are optimised subject to deformation penalties. DPMs were the peak of classical detection, illustrating that mid-level compositional structure and limited deformation invariance are essential for robust localisation. However, their reliance on fixed HOG features constrained generalisation, motivating learned representations.
+
+\subsection{Deep learning for Object Detection}
+The success of CNNs on ImageNet catalysed a shift from engineered features to learned hierarchical representations, substantially improving detection accuracy. Two families emerged: two-stage detectors that separate proposal generation from classification, and one-stage detectors that predict boxes and classes directly.
+
+\subsubsection{Two-stage detectors}
+R-CNN introduced region-based CNN detection by applying a CNN to class-independent proposals from selective search \cite{girshick2014rcnn}. Despite accuracy gains, R-CNN required a forward pass per proposal and multi-stage training, leading to high computational cost. Fast R-CNN addressed redundancy by computing a shared convolutional feature map once per image and extracting proposal-specific features via RoI pooling \cite{girshick2015fastrcnn}. Faster R-CNN replaced selective search with a learnable Region Proposal Network (RPN), enabling end-to-end optimisation and substantially faster inference \cite{ren2015fasterrcnn}. 
+
+Mask R-CNN extended this pipeline to instance segmentation and introduced RoI Align to avoid quantisation artefacts in RoI pooling, improving localisation fidelity \cite{he2017maskrcnn}. Collectively, two-stage detectors demonstrated that decoupling proposal filtering from downstream refinement yields high accuracy, particularly in cluttered scenes and for small objects. Their main limitations are runtime overhead from proposal processing and reliance on anchor heuristics.
+
+\subsubsection{One-stage detectors}
+One-stage detectors seek real-time performance by removing an explicit proposal stage. YOLOv1 formulated detection as regression on a coarse grid, enabling a single forward pass for both classification and localisation \cite{redmon2016yolov1}. Subsequent YOLO variants introduced anchors, multi-scale prediction, improved backbones, decoupled heads, and stronger data augmentation to improve accuracy and small object handling \cite{redmon2017yolov2,redmon2018yolov3,bochkovskiy2020yolov4,jocher2020yolov5}. Recent versions have moved toward anchor-free heads and increasing attention integration \cite{ge2024yolov9,wang2024yolov10,ultralytics2024yolov11,ultralytics2025yolov12}.
+
+SSD similarly unified dense prediction with multi-scale feature maps and default boxes, improving performance over early YOLO for small objects through pyramidal feature hierarchies \cite{liu2016ssd}. RetinaNet identified foreground-background imbalance as a key obstacle for dense detectors and proposed focal loss to down-weight easy negatives, allowing one-stage models to match two-stage accuracy \cite{lin2017focalloss}.
+
+\subsection{Multi-scale feature modelling}
+Scale variation is a central challenge in detection because objects may occupy a few pixels or most of the image. CNN backbones naturally produce a hierarchy of features across resolutions, but high-resolution layers are weak semantically while low-resolution layers lose localisation detail. Feature Pyramid Networks (FPN) combine top-down semantic signals with bottom-up high-resolution features through lateral connections, yielding strong multi-scale representations \cite{lin2017fpn}. PANet augments FPN with a bottom-up path aggregation to shorten information flow from shallow layers \cite{liu2018panet}, while BiFPN introduces bidirectional fusion and learnable feature weights to improve scale-adaptive aggregation \cite{tan2020efficientdet}. These designs underpin most competitive CNN detectors and are particularly important for small object detection.
+
+\begin{table}[t]
+\centering
+\caption{Summary of multi-scale CNN feature fusion strategies discussed in Section 2.1.3.}
+\label{tab:cnn_multiscale_fusion}
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{l p{3.6cm} p{3.2cm} p{3.8cm}}
+\toprule
+\textbf{Method} & \textbf{Fusion Direction} & \textbf{Key Mechanism} & \textbf{Strengths / Limitations} \\
+\midrule
+FPN \cite{lin2017fpn} 
+& Top-down with lateral links 
+& Semantic features injected into high-res maps 
+& Strong pyramids for scale variation; limited bottom-up feedback \\
+PANet \cite{liu2018panet} 
+& Bidirectional (top-down + bottom-up) 
+& Path aggregation to shorten information flow 
+& Better localisation and small-object recall; higher compute \\
+BiFPN \cite{tan2020efficientdet} 
+& Repeated bidirectional fusion 
+& Learnable weighted feature fusion 
+& Scale-adaptive aggregation; added architectural complexity \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\subsection{Modern CNN backbones and residual limitations}
+Backbone advances have continued to improve detection performance. ConvNeXt modernised ResNet-style CNNs via large kernels, inverted bottlenecks, and training recipes inspired by transformers, narrowing the accuracy gap to ViT backbones on detection benchmarks \cite{liu2022convnext,woo2023convnextv2}. RepVGG demonstrated structural re-parameterisation, using multi-branch training graphs that collapse to efficient single-branch inference-time blocks \cite{ding2021repvgg}. Such backbones offer favourable speed-accuracy trade-offs, yet their inductive biases still impose structural constraints on detection.
+
+\subsection{Motivations for attention-centric detectors}
+Despite strong empirical performance, CNNs exhibit limitations that are especially relevant when detection requires global context or precise handling of small instances. First, the effective receptive field of deep CNNs is substantially smaller than the theoretical receptive field, with influence concentrated near the centre of a feature’s support, limiting long-range interaction \cite{luo2016erf}. Second, CNNs trained on large-scale classification data show a bias toward local texture cues rather than global shape, which can reduce robustness under domain shift and affect boundary-sensitive localisation \cite{geirhos2019texturebias}. Third, aggressive downsampling in standard backbones can collapse small objects into a few feature cells, making them difficult to recognise even with feature pyramids. 
+
+These issues motivate architectures that provide content-adaptive global interactions through attention. Hybrid CNN-attention models and transformer-based detectors, including DETR and its descendants, address these limitations by enabling long-range dependency modelling and dynamic receptive fields \cite{carion2020detr}. The remainder of this chapter builds on these foundations to examine transformer-based detection in detail, with emphasis on multi-scale reasoning and interpretability.
+
+
+% \section{Vision Transformers for Vision Tasks}
+% Here, summarise the origin of Vision Transformers (ViTs) and outline why self-attention enables stronger global reasoning than CNNs. Compare the representational characteristics of ViTs and CNNs, covering receptive field, hierarchical modelling, and inductive biases. Introduce early uses of ViTs for detection, including DETR's adoption of transformer encoders and subsequent approaches like ViTDet and hybrid CNN–Transformer backbones.
+
+\section{Vision Transformers for Vision Tasks}
+\label{sec:vit_for_vision_tasks}
+
+Vision Transformers (ViTs) have become a central representation family in modern computer vision, offering a principled alternative to convolutional backbones for both recognition and dense prediction. Their emergence is best understood as a continuation of earlier efforts to model long-range dependencies in visual data. Classical convolutional neural networks (CNNs) build representations through local operators whose receptive field grows only with depth. Although effective, such locality can limit global context modelling and impose fixed inductive biases. In contrast, attention-based operators enable content-adaptive interactions between distant regions, motivating the transition to transformer-style architectures for vision.
+
+\subsection{Self-attention as a non-local visual operator}
+A useful perspective is to view self-attention as a learnable non-local filtering mechanism. Non-local neural networks introduced a generic operation where the response at a position is computed as a weighted aggregation over all positions, explicitly addressing the limitations of purely local convolutional processing \cite{wang2018nonlocal}. Transformer self-attention instantiates this idea in a scalable form by projecting an input sequence into queries, keys, and values, and then computing data-dependent affinity weights across the full sequence \cite{vaswani2017attention}. Formally, given input tokens $X \in \mathbb{R}^{N \times d}$, self-attention computes
+\begin{equation}
+\mathrm{Attention}(Q,K,V) = \mathrm{softmax}\!\left(\frac{QK^\top}{\sqrt{d_k}}\right)V,
+\end{equation}
+where $Q=XW^Q$, $K=XW^K$, $V=XW^V$, and $d_k$ is the key dimension \cite{vaswani2017attention}. 
+This operator yields a global receptive field from the first layer, allowing relationships between distant regions to be modelled directly rather than being mediated through many stacked local layers. For vision, this global interaction is particularly valuable in cluttered scenes, under strong scale variation, and for small objects whose context may lie far from their pixels.
+
+\subsection{The canonical Vision Transformer}
+The Vision Transformer adapts the standard transformer encoder to images by treating them as a sequence of patch tokens \cite{dosovitskiy2021vit}. An image $x \in \mathbb{R}^{H \times W \times C}$ is partitioned into non-overlapping patches of size $P \times P$, flattened, and linearly projected to $D$-dimensional embeddings. The resulting token sequence length is $N = HW/P^2$. Learnable positional embeddings are added to preserve spatial ordering, and the sequence is processed by a stack of multi-head self-attention and feed-forward blocks. 
+
+ViT offers two main representational advantages over CNNs. First, global context is available immediately through attention, enabling holistic scene reasoning. Second, the inductive bias of locality and translation equivariance is reduced, allowing representations to be shaped more strongly by data. At sufficient pretraining scale, ViTs have shown competitive or superior performance to CNNs on image classification and transfer tasks \cite{dosovitskiy2021vit}. However, two limitations are central for downstream detection. (i) Self-attention scales quadratically in token count, making high-resolution inputs expensive. (ii) The default ViT backbone is single-scale, producing a columnar feature map rather than the multi-resolution pyramid that dense predictors typically require.
+
+\subsection{Hierarchical Vision Transformers and multi-scale pyramids}
+Dense prediction tasks, including object detection, require multi-scale representations to handle large variations in object size. Hierarchical ViTs restore pyramidal structure while retaining transformer-style global modelling. These backbones progressively reduce spatial resolution and increase channel capacity across stages, analogous to CNN feature hierarchies.
+
+\subsubsection{Swin Transformer}
+The Swin Transformer is a widely adopted hierarchical ViT that introduces window-based self-attention to reduce the quadratic cost \cite{liu2021swin}. Features are partitioned into fixed-size windows, and attention is computed locally within each window, giving linear complexity in image size. To avoid isolating windows, Swin alternates regular window attention with shifted-window attention, enabling cross-window information flow over consecutive blocks \cite{liu2021swin}. This design yields a strong local-to-global inductive bias that is well aligned with detection requirements, and Swin backbones have become standard for high-performing transformer detectors and hybrids.
+
+\subsubsection{Pyramid Vision Transformer (PVT)}
+PVT pursues hierarchy through global attention with spatial reduction, decreasing the length of key and value sequences while maintaining global query interactions \cite{wang2021pvt}. PVTv2 further improves efficiency and local fidelity via overlapping patch embeddings and linear spatial reduction mechanisms \cite{wang2022pvtv2}. Compared to Swin, PVT provides global context earlier while controlling cost through subsampled attention, offering another effective family of pyramidal ViT backbones for dense tasks.
+
+Overall, hierarchical ViTs address the two core issues of plain ViT backbones for detection: they make high-resolution processing tractable and supply multi-scale features that can interface naturally with detector necks and heads.
+
+\subsection{ViTs in detection pipelines}
+The use of ViTs for object detection has developed along two complementary directions. The first couples hierarchical ViT backbones with transformer-based or CNN-based detector heads. In this setting, multi-scale features from Swin or PVT can be consumed directly by pyramid necks or multi-scale attention mechanisms, improving small-object performance and convergence \cite{liu2021swin,wang2022pvtv2}. The second direction shows that plain ViTs can remain competitive for detection when multi-scale features are constructed at the neck. ViTDet demonstrates that a single-scale ViT output can be converted into a feature pyramid using simple upsampling and downsampling modules, yielding strong COCO performance when paired with large-scale self-supervised pretraining \cite{li2022vitdet}. This line of work highlights that multi-scale representation is essential for detection, but the pyramid can be introduced either by architectural hierarchy or by downstream construction.
+
+Self-supervised and masked pretraining have been particularly important for ViT backbones in detection. Masked Autoencoders (MAE) provide a scalable way to pretrain ViTs on large image corpora, substantially improving transfer to dense prediction and reducing dependence on strong convolutional priors \cite{he2022mae}. Similarly, recent self-distillation approaches such as DINOv2 learn robust ViT features that transfer effectively to detection when paired with suitable heads \cite{oquab2023dinov2}. These results reinforce that data scale and pretraining strategy are critical levers for ViT-based detection, often compensating for weaker built-in inductive biases relative to CNNs.
+
+\begin{table}[t]
+\centering
+\caption{Comparison of ViT-style backbones and related representation trends discussed in Sections 2.2.2 to 2.2.6.}
+\label{tab:vit_backbones_detection}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{p{2.1cm} p{3.0cm} p{2.4cm} p{4.1cm}}
+\toprule
+\textbf{Backbone / Line} & \textbf{Attention / Tokenisation} & \textbf{Multi-scale Availability} & \textbf{Notable Properties for Detection} \\
+\midrule
+ViT \cite{dosovitskiy2021vit}
+& Global full attention over patch tokens
+& None (single-scale)
+& Strong global context; expensive at high resolution; needs neck-based pyramids \\
+
+Swin Transformer \cite{liu2021swin}
+& Window attention + shifted windows
+& Yes (hierarchical stages)
+& Linear-ish cost; strong local-to-global bias; widely adopted in detectors \\
+
+PVT \cite{wang2021pvt}
+& Global attention with spatial reduction
+& Yes (hierarchical)
+& Early global context with efficient keys/values; good scale handling \\
+
+PVTv2 \cite{wang2022pvtv2}
+& Improved SR attention + overlapping patches
+& Yes (hierarchical)
+& Better local fidelity and efficiency than PVT \\
+
+ViTDet \cite{li2022vitdet}
+& Plain ViT + constructed pyramid neck
+& Constructed downstream
+& Shows single-scale ViT can be competitive once pyramids are added \\
+
+MAE-pretrained ViTs \cite{he2022mae}
+& Masked reconstruction pretraining
+& Depends on backbone
+& Major boost for dense transfer, compensating for weaker inductive bias \\
+
+DINOv2-pretrained ViTs \cite{oquab2023dinov2}
+& Self-distillation pretraining
+& Depends on backbone
+& Robust transferable representations for detection heads \\
+
+Vision Mamba / MambaVision \cite{liu2024visionmamba,hatamizadeh2025mambavision}
+& State-space selective scan in place of attention
+& Emerging hierarchical forms
+& Linear-complexity global context; early evidence of ViT-like detection utility \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+
+\subsection{Strengths, weaknesses, and relevance to DETR-style detectors}
+In the context of detection, ViTs provide clear strengths: (i) global context modelling from early layers, (ii) flexible long-range interactions that are beneficial under occlusion and clutter, and (iii) strong transferability when pretrained at scale \cite{dosovitskiy2021vit,he2022mae,li2022vitdet}. Their weaknesses are also well established. Plain ViTs are computationally heavy at high resolutions due to quadratic attention, and their lack of intrinsic pyramids can degrade small-object performance unless multi-scale features are explicitly introduced \cite{dosovitskiy2021vit,liu2021swin}.
+
+These properties directly motivate the integration of ViTs with DETR-style set prediction frameworks. DETR relies on transformer reasoning over a spatial feature sequence and benefits from backbones that expose global context and strong token representations \cite{carion2020detr}. At the same time, DETR variants designed for practical detection emphasise multi-scale processing and efficiency (for example, via sparse multi-scale attention), which aligns naturally with hierarchical ViT backbones \cite{zhu2021deformabledetr,liu2021swin}. Therefore, ViTs serve not only as high-capacity alternatives to CNN backbones but also as conceptually compatible foundations for fully transformer-based detection pipelines, which forms the basis for the subsequent DETR-focused review.
+
+\subsection{Recent trends beyond attention}
+While attention-based ViTs remain dominant, recent work explores linear-complexity alternatives for visual representation learning. Vision Mamba replaces quadratic attention with bidirectional state space models to obtain global context at linear cost, and has shown competitive results to hierarchical ViTs on high-resolution vision tasks \cite{liu2024visionmamba}. Hybrid backbones such as MambaVision combine selective scan modules with transformer blocks, suggesting a possible path toward more efficient ViT-like detectors \cite{hatamizadeh2025mambavision}. These developments are not yet central to DETR design, but they indicate that the key requirement for detection remains multi-scale global-plus-local representation, while the underlying computation primitive may evolve.
+
+
+
+% \section{Detection Transformers (DETR)}
+% Provide an overview of the original DETR architecture, focusing on its encoder–decoder structure, bipartite matching for object assignment, and the role of object queries. Discuss DETR's advantages such as end-to-end training and removal of hand-crafted components like anchor design and NMS. Then review its main shortcomings: slow convergence, difficulty with small objects, scale sensitivity, and high training cost. Present key DETR variants including Deformable-DETR, Conditional DETR, DAB-DETR, DN-DETR, DINO, and efficient DETR families, explaining how each addresses specific limitations of baseline DETR.
+
+\section{Detection Transformers (DETR)}
+\label{sec:detr}
+
+Detection Transformers (DETR) reformulate object detection as a direct set prediction problem solved with a transformer encoder–decoder architecture and bipartite matching loss \cite{carion2020detr}. In contrast to classical CNN detectors that operate on dense grids of anchors and rely on heuristic post–processing such as Non–Maximum Suppression (NMS), DETR predicts a fixed–size set of object candidates and learns one–to–one assignments between predictions and ground truth. This section first formalises the DETR formulation, then reviews architectural refinements that address its convergence and efficiency issues, with particular emphasis on variants that are relevant to real–time and ViT–based detectors used later in this thesis.
+
+\subsection{Formulation as set prediction}
+
+Given an input image $x$, DETR predicts a fixed–size set of $N$ detection outputs
+\begin{equation}
+\hat{\mathcal{Y}} = \{ \hat{y}_i \}_{i=1}^{N}, \quad 
+\hat{y}_i = (\hat{p}_i(c), \hat{b}_i),
+\end{equation}
+where $\hat{p}_i(c)$ is a categorical distribution over object classes (including a special ``no–object'' label $\varnothing$) and $\hat{b}_i = (\hat{x}_i, \hat{y}_i, \hat{w}_i, \hat{h}_i)$ are normalised bounding box coordinates. For an image with $M \leq N$ ground truth objects
+\begin{equation}
+\mathcal{Y} = \{ y_j \}_{j=1}^{M}, \quad y_j = (c_j, b_j),
+\end{equation}
+the set is padded to size $N$ with $\varnothing$ labels.
+
+The core idea is to cast supervision as an optimal bipartite matching problem between $\hat{\mathcal{Y}}$ and $\mathcal{Y}$. Let $\mathfrak{S}_N$ denote the set of permutations of $\{1,\dots,N\}$. DETR defines a matching cost $\mathcal{L}_{\mathrm{match}}(y_j, \hat{y}_{\sigma(j)})$ and selects the optimal permutation
+\begin{equation}
+\hat{\sigma} = \arg\min_{\sigma \in \mathfrak{S}_N} 
+\sum_{j=1}^{N} \mathcal{L}_{\mathrm{match}}(y_j, \hat{y}_{\sigma(j)}).
+\label{eq:detr_matching}
+\end{equation}
+The matching cost combines classification and localisation terms for non–empty targets:
+\begin{equation}
+\mathcal{L}_{\mathrm{match}}(y_j, \hat{y}_{\sigma(j)}) =
+\mathbb{1}_{\{c_j \neq \varnothing\}}
+\Big[
+\lambda_{\mathrm{cls}} \big(-\hat{p}_{\sigma(j)}(c_j)\big)
++
+\lambda_{\mathrm{box}} \Vert b_j - \hat{b}_{\sigma(j)} \Vert_1
++
+\lambda_{\mathrm{giou}} \mathcal{L}_{\mathrm{GIoU}}(b_j, \hat{b}_{\sigma(j)})
+\Big],
+\end{equation}
+where $\mathcal{L}_{\mathrm{GIoU}}$ is the Generalised IoU loss and $\lambda_{\mathrm{cls}},\lambda_{\mathrm{box}},\lambda_{\mathrm{giou}}$ are scalar weights \cite{carion2020detr}.
+
+Given the optimal assignment $\hat{\sigma}$, the training objective (Hungarian loss) is
+\begin{equation}
+\mathcal{L}_{\mathrm{Hungarian}} =
+\sum_{j=1}^{N}
+\Big[
+- \log \hat{p}_{\hat{\sigma}(j)}(c_j)
++
+\mathbb{1}_{\{c_j \neq \varnothing\}}
+\big(
+\lambda_{\mathrm{box}} \Vert b_j - \hat{b}_{\hat{\sigma}(j)} \Vert_1
++
+\lambda_{\mathrm{giou}} \mathcal{L}_{\mathrm{GIoU}}(b_j, \hat{b}_{\hat{\sigma}(j)})
+\big)
+\Big].
+\label{eq:hungarian_loss}
+\end{equation}
+The bipartite matching in \eqref{eq:detr_matching} is solved exactly using the Hungarian algorithm with cubic complexity in $N$, which is negligible for typical $N \in \{100,300\}$.
+
+This formulation removes heuristic assignment rules, anchors, and NMS. Instead, the model learns a permutation–invariant mapping from images to object sets that is supervised end–to–end.
+
+\subsection{Encoder–decoder architecture and object queries}
+
+DETR adopts a standard transformer encoder–decoder architecture on top of a convolutional backbone \cite{carion2020detr}. A backbone CNN (for example ResNet–50) produces a feature map $f \in \mathbb{R}^{C \times H \times W}$, which is flattened into a sequence of $L = HW$ tokens $X \in \mathbb{R}^{L \times d}$ and augmented with positional encodings. The encoder applies $L_{\mathrm{enc}}$ layers of multi–head self–attention and feed–forward blocks, as described in Section~\ref{sec:vit}, to obtain contextualised features $Z \in \mathbb{R}^{L \times d}$.
+
+The decoder operates on a fixed set of $N$ learned \emph{object queries} $Q \in \mathbb{R}^{N \times d}$. Each decoder layer alternates between self–attention over queries, cross–attention from queries to encoder features, and a position–wise feed–forward network. Using the notation of self–attention in Section~\ref{sec:vit},
+\begin{align}
+\mathrm{SA}(Q) &= \mathrm{MultiHeadAttn}(Q, Q, Q), \\
+\mathrm{CA}(Q, Z) &= \mathrm{MultiHeadAttn}(Q, Z, Z),
+\end{align}
+where the multi–head attention operator
+\begin{equation}
+\mathrm{MultiHeadAttn}(Q, K, V) = \mathrm{Concat}(\mathrm{head}_1,\dots,\mathrm{head}_M) W^O
+\end{equation}
+is computed from per–head projections $QW_i^Q, KW_i^K, VW_i^V$ and scaled dot–product attention
+\begin{equation}
+\mathrm{head}_i = \mathrm{softmax}\!\left(\frac{QW_i^Q (KW_i^K)^{\top}}{\sqrt{d_k}}\right) VW_i^V.
+\end{equation}
+
+Intuitively, the decoder treats each query as a slot that competes to explain one object. Self–attention among queries encourages diversity and suppresses duplicates, while cross–attention lets each query attend to the spatial regions in $Z$ that support its prediction. A small prediction head (typically a feed–forward network and a linear classifier) maps each decoded query to $(\hat{p}_i, \hat{b}_i)$.
+
+This design confers several advantages over anchor–based CNN detectors. The model is trained end–to–end with a single objective, there is no hand–designed anchor configuration or NMS threshold, and the fixed set of queries provides a natural handle for per–object reasoning and interpretability in later chapters.
+
+\subsection{Limitations of vanilla DETR}
+
+Despite its conceptual simplicity, the original DETR exhibits several practical limitations \cite{carion2020detr}:
+
+\begin{itemize}
+    \item \textbf{Slow convergence:} The bipartite matching and fully global attention introduce strong global coupling between predictions. Empirically, DETR requires around 500 training epochs on COCO to match Faster R-CNN performance, an order of magnitude more than typical CNN detectors.
+    \item \textbf{Small object performance:} DETR operates on a single low–resolution feature map from the backbone. Combined with global attention that treats all positions symmetrically, this leads to degraded performance for small instances, especially when they occupy only a few feature cells.
+    \item \textbf{High computational cost:} The encoder applies dense self–attention over all $HW$ token pairs. The quadratic complexity in spatial resolution restricts the use of higher–resolution features that would otherwise help small objects.
+    \item \textbf{Implicit query semantics:} The original object queries are learned as free vectors without explicit spatial meaning. Early in training, there is no stable correspondence between queries and ground truth objects, which contributes to optimisation instability.
+\end{itemize}
+
+These limitations have driven a rich line of work aiming to accelerate convergence, introduce multi–scale information, and make queries more structured. The remainder of this section reviews major families of DETR variants with an emphasis on those that provide efficient, multi–scale, and ViT–compatible detection backbones.
+
+\subsection{Deformable attention and multi–scale DETR variants}
+
+\subsubsection{Deformable DETR}
+
+Deformable DETR addresses both the convergence and small–object issues by introducing multi–scale sparse attention \cite{zhu2021deformabledetr}. Instead of attending densely to all $HW$ encoder tokens, each query samples a small number of key points around learned reference locations across multiple feature levels.
+
+Let $\{X^l\}_{l=1}^{L_s}$ denote multi–scale feature maps (for example from FPN levels), and let $p_q$ be the reference point of query $q$ in normalised coordinates. Multi–scale deformable attention computes
+\begin{equation}
+\mathrm{MSDeformAttn}(z_q, p_q, \{X^l\}) =
+\sum_{m=1}^{M} W_m
+\left(
+\sum_{l=1}^{L_s} \sum_{k=1}^{K}
+A_{mlqk} \,
+\phi\big(X^l, p_q + \Delta p_{mlqk}\big)
+\right),
+\end{equation}
+where $z_q$ is the query feature, $A_{mlqk}$ are learned attention weights that sum to one over $(l,k)$, $\Delta p_{mlqk}$ are learned offsets, and $\phi(\cdot)$ samples features at non–integer locations via bilinear interpolation. Each head thus attends to $K$ sampling points per level rather than all locations, giving attention cost that scales linearly with the number of features.
+
+Deformable DETR uses this operator both in the encoder and decoder, and extends the architecture with iterative bounding box refinement and a two–stage variant that generates proposals from encoder outputs \cite{zhu2021deformabledetr}. These changes reduce training from 500 to roughly 50 epochs while improving AP, particularly for small and medium objects.
+
+\subsubsection{Other encoder–level efficiency variants}
+
+Several works further reduce encoder cost or introduce multi–scale structure. Sparse DETR activates only a subset of encoder tokens that are judged relevant to the decoder, enabling auxiliary losses in the encoder while keeping attention sparse \cite{sparse_detr_roh}. Lite DETR replaces full multi–scale deformable attention with a key–aware sparse variant and focuses computation on regions likely to contain small objects \cite{Lite_DETR_Li}. Efficient DETR incorporates dense priors and lighter attention blocks to accelerate training and inference \cite{EfficientDETR_yao}. These designs highlight a common pattern: multi–scale information is essential for detection, but full global attention over all scales is not required.
+
+\subsection{From implicit to explicit queries}
+
+A second line of work focuses on the semantics and optimisation of object queries.
+
+\subsubsection{Conditional DETR}
+
+Conditional DETR observes that in vanilla DETR each query must encode both appearance and position, and that the positional component is implicitly entangled with content features \cite{meng2021conditionaldetr}. To disentangle these roles, Conditional DETR splits queries into content and spatial parts and conditions the cross–attention on reference points. The decoder uses a content query $q^{\mathrm{c}}$ and a separate positional query $q^{\mathrm{p}}$, where $q^{\mathrm{p}}$ is obtained from a positional encoding of the reference coordinates. This conditioning restricts the spatial search space for each query and accelerates convergence.
+
+\subsubsection{DAB–DETR: dynamic anchor boxes}
+
+DAB–DETR further makes queries explicit by parameterising each query as a 4D anchor box $(x,y,w,h)$ instead of a free vector \cite{liu2022dabdetr}. The anchor is embedded via a small MLP and positional encoding to produce the positional query:
+\begin{equation}
+q^{\mathrm{p}} = \mathrm{MLP}\big(\mathrm{PE}(x,y,w,h)\big).
+\end{equation}
+Decoder layers iteratively refine the anchor box, analogous to bounding–box regression in anchor–based detectors. Including width and height in the positional encoding provides the attention mechanism with a notion of spatial extent and improves stability for large and elongated objects. DAB–DETR maintains the end–to–end matching of DETR while inheriting some benefits of anchor priors.
+
+\subsubsection{DN–DETR: query denoising}
+
+DN–DETR identifies training instability stemming from the Hungarian matching itself: early in training, random predictions lead to rapidly changing assignments and inconsistent gradients for each query \cite{li2022dndetr}. To stabilise optimisation, DN–DETR adds a denoising branch that constructs noisy replicas of ground truth boxes and forces the decoder to reconstruct the original targets.
+
+Concretely, ground truth boxes are duplicated and perturbed with random noise in coordinates and labels. These noisy boxes are encoded as queries and concatenated with the standard learnable queries. For denoising queries, the assignment to ground truth is known by construction, so the model can be supervised without bipartite matching. The resulting loss provides consistent gradients that guide the decoder to learn localisation and classification before the matching branch stabilises.
+
+\subsection{DINO and unified DETR training recipes}
+
+DINO (DETR with Improved DeNoising Anchor Boxes) unifies and extends these ideas into a strong and widely adopted DETR baseline \cite{zhang2022dino}. It builds on a deformable–attention backbone and DAB–style anchors and refines the denoising strategy in several ways.
+
+First, DINO introduces \emph{contrastive denoising}. Noisy queries are generated in two groups: positive queries with small perturbations that should reconstruct the original boxes and negative queries with large perturbations that should be classified as background. The denoising loss combines reconstruction and contrastive terms, sharpening the decision boundary between valid and invalid detections.
+
+Second, DINO uses \emph{mixed query selection}. Instead of static learnable content queries, it selects top–scoring encoder features to initialise query content and anchor positions. This hybrid initialisation gives the decoder a more informative starting point and improves convergence.
+
+Third, a \emph{look–forward twice} refinement scheme propagates gradients from later decoder layers back to earlier layers that predict intermediate boxes, aligning intermediate refinement with the final prediction objective.
+
+These components yield a large improvement in both convergence speed and accuracy; DINO achieves strong COCO performance in as few as 12 epochs and has become the default backbone for many subsequent extensions, including feature–level stabilisation and multi–dataset pretraining.
+
+Stable–DINO combines DINO with features from self–supervised ViT models (for example DINOv2) and diffusion models to improve semantic correspondence and robustness \cite{ccdn_detr_sar,sd_dino_correspondence}. Although originally proposed for zero–shot correspondence, this line of work demonstrates that strong ViT pretraining can further enhance transformer detectors, reinforcing the thesis motivation to explore pure ViT backbones.
+
+\subsection{Hybrid assignment and dense supervision}
+
+While one–to–one matching is ideal for NMS–free inference, it provides sparse supervision compared to one–to–many assignments in conventional detectors. Recent work therefore aims to combine the benefits of both schemes.
+
+\subsubsection{Group–DETR and Co–DETR}
+
+Group–DETR replicates the query set into $K$ groups and performs independent one–to–one matching per group during training \cite{chen2023groupdetr}. Each ground truth object can therefore supervise up to $K$ queries, producing denser gradients without modifying the inference pipeline (only one group is used at test time). Group–wise training accelerates convergence and improves AP at a fixed number of epochs.
+
+Co–DETR takes a different approach: it attaches auxiliary heads based on classical detectors such as ATSS and Faster R-CNN to the encoder and trains them with one–to–many assignments in parallel with the DETR head \cite{zong2023codetr}. These collaborative hybrid assignments encourage the encoder to learn features that are simultaneously suitable for dense anchors and one–to–one queries. Co–DETR reports large gains on COCO, illustrating that dense auxiliary supervision can substantially strengthen DETR models without changing their inference behaviour.
+
+\subsubsection{MS–DETR and improved matching}
+
+MS–DETR further integrates mixed supervision directly into the DETR decoder \cite{zhao2024msdetr}. Instead of separate heads or groups, it applies both one–to–one and one–to–many losses to the same set of queries. A standard Hungarian assignment defines the primary loss, while an auxiliary loss uses relaxed assignments that allow each ground truth to match multiple queries. This avoids architectural complexity and yields faster and more data–efficient training.
+
+DEIM (DETR with Improved Matching) takes a data–centric perspective \cite{huang2025deim}. By augmenting training images with strategies such as Mosaic and Mixup, DEIM increases the number of effective objects per image. The Hungarian matching then produces more positive pairs by construction, leading to denser one–to–one supervision without changing the architecture. A matchability–aware loss further reweights samples according to their predicted quality.
+
+\subsubsection{Relation–DETR, Align–DETR and MI–DETR}
+
+Relation–DETR explicitly encodes geometric relations between queries using a relation prior module \cite{hou2024relationdetr}. Distances and angles between query reference points are embedded and injected into the attention mechanism, providing structural information such as ``near'', ``inside'' and ``surrounding'' that is hard to learn implicitly. This improves convergence, particularly at low training budgets, and is attractive for scenarios where training time is constrained.
+
+Align–DETR targets the misalignment between classification confidence and localisation quality that is often observed in DETR–style models \cite{felix2024aligndetr}. It introduces an aligned loss that couples classification logits with IoU quality, encouraging high confidence only for well–localised boxes and improving calibration of detection scores.
+
+MI–DETR proposes a multi–inquiry mechanism in which multiple rounds of query updates are performed with shared parameters to progressively refine predictions while keeping the parameter count low \cite{nan2025midetr}. Such designs are relevant to this thesis because they show that carefully structured decoder interactions can improve efficiency without sacrificing accuracy.
+
+\subsection{Real–time detection transformers}
+
+For real–time applications, the primary bottleneck of DETR variants is the multi–scale transformer encoder. RT–DETR demonstrates that carefully designed hybrid architectures can achieve both high accuracy and real–time speed, surpassing contemporary YOLO models on COCO \cite{lv2023rtdetr,arxiv_rtdetr_beatyolo}.
+
+\subsubsection{RT–DETR and hybrid encoders}
+
+RT–DETR adopts a CNN backbone (for example ResNet or CSP–style networks) and constructs a three–level feature pyramid ($S_3$, $S_4$, $S_5$). Instead of applying multi–scale deformable attention to all levels, it uses a hybrid encoder composed of two modules \cite{lv2023rtdetr}:
+
+\begin{itemize}
+    \item An \emph{attention–based intra–scale feature interaction} module that applies self–attention only on the lowest–resolution but semantically richest level ($S_5$), capturing global context at low cost.
+    \item A \emph{CNN–based cross–scale feature fusion} module that uses lightweight convolutional blocks (for example PANet–like top–down and bottom–up paths) to fuse $S_3$–$S_5$ without attention.
+\end{itemize}
+
+The decoder follows a DINO–style design with IoU–aware query selection: high–quality candidates from the encoder are used to initialise query content and reference points. This architecture significantly reduces encoder complexity while maintaining the benefits of transformer–based querying and matching. RT–DETR achieves high FPS on GPU hardware and forms the backbone of the detectors used in this thesis for road damage detection.
+
+\subsubsection{RT–DETRv2 and RT–DETRv3}
+
+RT–DETRv2 refines the design by decoupling encoder and decoder depths, enabling flexible speed–accuracy trade–offs by adjusting decoder layers without retraining the entire model \cite{medium_rtdetr_hybrid}. The more recent RT–DETRv3 introduces hierarchical dense positive supervision \cite{wang2025rtdetrv3}. A CNN auxiliary branch and a shared–weight decoder branch provide dense one–to–many supervision in parallel to the main one–to–one branch, and self–attention perturbation is used as data–dependent regularisation. RT–DETRv3 achieves state–of–the–art accuracy in the real–time regime and exemplifies how hybrid assignment schemes can be integrated into efficient architectures.
+
+\subsection{Summary and implications}
+
+The evolution from DETR to Deformable DETR, DINO, hybrid assignment schemes, and RT–DETR illustrates how set–prediction detectors have progressively addressed slow convergence, multi–scale reasoning, and efficiency constraints. A consistent trend is the move toward more structured queries, explicit multi–scale attention, and richer supervision during training, while preserving a clean NMS–free inference pipeline.
+
+For small object detection, multi–scale deformable attention and hybrid encoder designs are particularly important, as they enable high–resolution features to be incorporated without prohibitive cost. For ViT–based detectors, DINO–style training recipes and collaborative assignment strategies provide strong baselines that can be combined with pure transformer backbones. The subsequent chapters build on these insights: Chapter~\ref{chap:road-damage} evaluates RT–DETR–style models on road damage detection, Chapter~\ref{chap:explainability} analyses the behaviour of DETR variants using explainability tools, and Chapters~\ref{chap:mcaf-detr} and \ref{chap:blca} introduce new multi–scale and latent cross–attention modules that further improve small–object performance and interpretability in DETR–style architectures.
+
+
+% \section{Multi-Scale Modelling in Detection}
+% Explain why multi-scale representation is essential in detection, with emphasis on small-object performance and real-world variability. Review classical CNN-based multi-scale designs such as FPN and PANet. Then transition to transformer-specific multi-scale mechanisms, including deformable attention, hybrid CNN–ViT pyramids, and hierarchical transformers such as Swin and PVT. Highlight the challenges of constructing efficient multi-scale pipelines in ViT-based detectors.
+
+\section{Multi-Scale Modelling in Detection}
+\label{sec:multiscale-modelling}
+
+Multi-scale representation is a central requirement for object detection because objects appear under significant scale variation across images and within a single scene. This challenge is amplified for small objects, whose visual evidence is weak, easily dominated by background clutter, and sensitive to downsampling in the backbone. As a result, most successful detection systems incorporate explicit mechanisms to preserve high-resolution detail while injecting stronger semantic context from coarser levels.
+
+\subsection{Multi-scale principles across detector families}
+Classical CNN-based detectors addressed scale variation by constructing feature pyramids that combine semantics and spatial detail. Feature Pyramid Networks (FPN) introduced a top-down pathway with lateral connections to merge high-level semantics into multiple resolutions at modest computational cost \cite{lin2017fpn}. Extensions such as PANet strengthened bottom-up information flow and cross-level aggregation, improving localisation and small-object recall by reducing the semantic gap between pyramid levels \cite{liu2018panet}. These designs established a general pattern that remains influential: multi-scale modelling is most effective when it couples (i) high-resolution features for precise localisation with (ii) low-resolution features for contextual reasoning, and (iii) provides cross-scale pathways that allow information to travel in both directions.
+
+Vision Transformers (ViTs) inherit a different inductive bias from CNNs and therefore require alternative multi-scale constructions. Plain ViT backbones produce a single-resolution token grid, and naive fine-tuning for detection often loses small-object detail due to coarse patching and quadratic attention cost. Hierarchical ViTs, including Swin Transformer and Pyramid Vision Transformer (PVT), explicitly reintroduce a pyramid by progressively reducing token resolution while expanding receptive fields \cite{liu2021swin,wang2021pvt}. These backbones enable ViT-based detectors to reuse FPN-like necks or to expose multi-level features directly, but they also introduce new design choices about where to place cross-scale fusion and how to align tokens across resolutions.
+
+DETR-style detectors reinterpret multi-scale modelling through attention rather than fixed pyramid operators. Vanilla DETR relies on a single-scale feature map, which limits small-object performance and slows convergence \cite{carion2020detr}. Deformable DETR addresses both issues by introducing multi-scale deformable attention, which attends to a sparse set of sampling points across multiple feature levels \cite{zhu2021deformable}. This attention-based pyramid eliminates the need for handcrafted FPN design while retaining the same conceptual role: high-resolution levels contribute localisation, while low-resolution levels contribute global context. More recent real-time DETRs, such as RT-DETR, further emphasise efficiency by using hybrid encoders that decouple intra-scale processing from cross-scale fusion, producing multi-scale features suitable for fast decoding \cite{zhao2023rtdetr}. In parallel, improved training recipes and hybrid assignment strategies, exemplified by DINO, strengthen supervision and stabilise learning over multiple scales \cite{zhang2022dino}.
+
+Viewed together, these families suggest a common set of multi-scale design dimensions:
+\begin{itemize}
+    \item \textbf{Where multi-scale is formed:} in the backbone (hierarchical CNNs or ViTs), neck (FPN-style fusion), encoder (multi-scale attention), or decoder (cross-attention over pyramids).
+    \item \textbf{How scales interact:} fixed top-down or bottom-up paths \cite{lin2017fpn,liu2018panet} versus learned cross-scale attention \cite{zhu2021deformable}.
+    \item \textbf{What is optimised:} small-object recall, convergence speed, and compute efficiency, often with explicit trade-offs between resolution and latency.
+\end{itemize}
+
+\subsection{Open challenges for ViT-based DETR pipelines}
+Despite substantial progress, multi-scale modelling remains a key bottleneck for ViT-based DETR detectors, especially in small-object and real-world settings.
+
+\paragraph{Scale sensitive detail versus global context.}
+Small objects require fine spatial granularity, but ViTs tend to aggregate information globally and early. Hierarchical ViTs partially restore locality, yet the smallest objects may still occupy only a few tokens at higher stages. DETR encoders and decoders can recover context, but they cannot reconstruct detail that is not preserved in the feature hierarchy. This creates a persistent tension between global reasoning and maintaining sufficient high-resolution evidence.
+
+\paragraph{Efficient cross-scale fusion with transformers.}
+CNN pyramids are inexpensive because convolutions share weights spatially and scale fusion is linear in pixels. In contrast, transformer-based fusion across multiple resolutions can incur high quadratic costs if performed densely. Deformable attention mitigates this by sparse sampling \cite{zhu2021deformable}, and RT-DETR reduces overhead through hybrid encoders and selective fusion \cite{zhao2023rtdetr}. However, sparse attention may miss subtle small-object cues unless sampling is well aligned, and aggressive efficiency constraints can degrade performance under heavy scale imbalance.
+
+\paragraph{Cross-scale feature alignment.}
+Effective fusion assumes that representations from different resolutions are compatible. In CNNs, alignment is largely ensured by the shared convolutional hierarchy. In ViT-based systems, multi-resolution tokenisation and windowing can introduce scale-dependent shifts, and attention-based fusion may blend misaligned features. This is particularly problematic when small objects are near the resolution limit, where slight misalignment causes large localisation errors. The need for principled alignment across scales becomes more acute when ViT backbones are combined with DETR decoders that rely on precise cross-attention to refine object queries.
+
+\paragraph{Training stability under scale imbalance.}
+Datasets often contain far more medium and large objects than small ones. FPN-style pyramids partially address this with dedicated high-resolution levels, but transformer-based detectors must also learn to allocate attention and supervision across scales. DINO-style denoising and mixed query selection improve gradient signals for difficult objects \cite{zhang2022dino}, yet robust small-object optimisation remains sensitive to scale sampling, loss weighting, and backbone resolution.
+
+% \subsection{Implications for this thesis}
+% The above challenges motivate a closer investigation of multi-scale fusion and alignment in ViT-based DETR architectures. While existing designs demonstrate that multi-scale attention and hybrid encoders can recover efficiency and improve small-object performance \cite{zhu2021deformable,zhao2023rtdetr}, they do not fully resolve cross-scale compatibility and stable fusion when pure or weakly hierarchical ViT backbones are used. This thesis builds on these observations in two ways. First, Chapter~\ref{chap:mcaf-detr} introduces MCAF-DETR, which focuses on explicit multi-scale alignment and more effective fusion strategies for ViT-derived features. Second, Chapter~\ref{chap:blca} develops BLCA, extending efficient cross-scale interaction into a latent bidirectional cross-attention formulation. Together, these contributions aim to preserve the benefits of end-to-end set prediction while improving small-object sensitivity, scale robustness, and computational practicality in modern DETR-style detectors.
+
+\subsection{Implications.}
+Together, these observations underline a central tension in modern detectors: achieving fine-grained spatial detail while retaining broad contextual reasoning across scales. Existing multi-scale designs vary in where pyramids are formed and how information flows between resolutions, but no approach provides a fully unified treatment of scale interaction. These gaps set the stage for examining how transformer-based detectors handle multi-scale signals and where current fusion mechanisms succeed or break down.
+
+\begin{table}[t]
+\centering
+\caption{Comprehensive summary of DETR variants reviewed across Section~2.3 (including efficiency, query design, supervision, and real-time variants).}
+\label{tab:detr_variants_full}
+\small
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{p{4cm} p{5cm} p{4.5cm}}
+\toprule
+\textbf{Variant} & \textbf{Core innovation} & \textbf{Addresses} \\
+\midrule
+
+DETR \cite{carion2020detr} 
+& Set prediction with bipartite matching and global attention 
+& End-to-end; removes anchors/NMS \\
+
+Deformable DETR \cite{zhu2021deformabledetr} 
+& Multi-scale sparse deformable attention 
+& Convergence; small objects; cost \\
+
+Sparse DETR \cite{sparse_detr_roh} 
+& Sparse encoder token activation 
+& Encoder efficiency \\
+
+Lite DETR \cite{Lite_DETR_Li} 
+& Key-aware sparse attention 
+& Speed; small objects \\
+
+Efficient DETR \cite{EfficientDETR_yao} 
+& Lightweight attention blocks and priors 
+& Training and inference efficiency \\
+
+Conditional DETR \cite{meng2021conditionaldetr} 
+& Decoupled content vs spatial query components 
+& Query instability; convergence \\
+
+DAB-DETR \cite{liu2022dabdetr} 
+& Dynamic anchor box queries 
+& Weak positional priors \\
+
+DN-DETR \cite{li2022dndetr} 
+& Query denoising during training 
+& Matching noise; stability \\
+
+DINO \cite{zhang2022dino} 
+& Unified denoising + contrastive supervision 
+& Convergence; robustness \\
+
+Group-DETR \cite{chen2023groupdetr} 
+& Query groups with independent matching 
+& Dense supervision; recall \\
+
+Co-DETR \cite{zong2023codetr} 
+& Collaborative decoding with auxiliary dense heads 
+& Dense supervision; robustness \\
+
+MS-DETR \cite{zhao2024msdetr} 
+& Multi-scale matching and refined assignments 
+& Scale imbalance \\
+
+Relation-DETR \cite{hou2024relationdetr} 
+& Explicit relation priors between encoder and decoder 
+& Context modelling \\
+
+Align-DETR \cite{felix2024aligndetr} 
+& Alignment objectives linking classification and localisation 
+& Cross-scale misalignment \\
+
+MI-DETR \cite{nan2025midetr} 
+& Multi-inquiry iterative refinement 
+& Optimisation stability \\
+
+RT-DETR \cite{lv2023rtdetr} 
+& Hybrid CNN–transformer encoder for real-time performance 
+& Speed–accuracy tradeoff \\
+
+RT-DETRv3 \cite{wang2025rtdetrv3} 
+& Dense auxiliary supervision and attention perturbation 
+& Latency; robustness \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+% \section{ViT-Based DETRs and Pure ViT Architectures}
+% In this section, discuss the architectural challenges of integrating ViT backbones with transformer-based detectors, including feature resolution, pyramid construction, and computational cost. Review approaches that adapt ViT features for detection, such as ViTDet, multi-scale ViT architectures, and pure ViT derivatives of DETR. Conclude by outlining the current gaps motivating this thesis, including efficient multi-scale fusion and robust feature alignment.
+
+\section{ViT-Based DETRs and Pure ViT Architectures}
+\label{sec:vit_based_detrs}
+
+The adoption of Vision Transformers (ViTs) as backbones for Detection Transformers (DETRs) has enabled fully attention-based detection pipelines, but it also exposes architectural tensions that were less visible in CNN based systems. A central challenge is the mismatch between ViT feature structure and the multi-scale requirements of detection. Plain ViTs produce a single-resolution token grid determined by the patch size and do not naturally yield a hierarchical pyramid. Consequently, DETR style decoders that expect semantically consistent features across multiple scales must either operate on a single coarse map, sacrificing small object detail, or rely on auxiliary modules to synthesise a pyramid from non-hierarchical representations \cite{li2022vitdet,fang2021yolos}. This issue is further amplified by the quadratic cost of global self-attention, which makes high-resolution token maps expensive and pushes practical systems toward lower feature resolutions or windowed attention schemes \cite{liu2021swin,wang2021pvt}. 
+
+\paragraph{Plain ViT backbones for detection.}
+Early work on pure or plain ViT backbones asked whether a non-hierarchical transformer encoder could serve as a drop-in replacement for CNNs in detection. YOLOS provides an intentionally minimal answer: it appends learnable detection tokens to the patch sequence and performs detection within a single ViT encoder stack, using set prediction supervision without an explicit decoder or feature pyramid \cite{fang2021yolos}. While this validates the expressive sufficiency of plain ViTs for localisation, its performance on small and dense objects remains limited by fixed patch resolution and the absence of multi-scale feature handling \cite{fang2021yolos}. 
+
+A more competitive line of work constructs detection-ready pyramids from plain ViTs. ViTDet shows that a simple feature pyramid built from the final ViT feature map, using lightweight upsampling and downsampling operators, can recover the scale diversity required by detector heads, without redesigning the backbone into a hierarchical form \cite{li2022vitdet}. To mitigate computational cost, ViTDet relies primarily on non-overlapping window attention, complemented by sparse global propagation blocks, retaining global context while keeping complexity manageable \cite{li2022vitdet}. Crucially, the success of this approach is tied to strong self-supervised pre-training. Masked Autoencoder (MAE) pre-training yields plain ViT features that transfer effectively to dense prediction and enable the reconstructed pyramid levels to remain semantically meaningful for localisation tasks \cite{he2022mae,li2022vitdet}. These findings suggest that plain ViTs are viable backbones for DETR frameworks, but only when pyramid synthesis and pre-training compensate for weak locality and scale priors.
+
+\paragraph{Adapters and detection-specific inductive bias.}
+Rather than altering ViT internals, several approaches introduce detection adapters that inject multi-scale or locality biases at fine-tuning time. ViT-Adapter attaches a lightweight, task-specific module that aggregates intermediate ViT activations into multi-resolution feature streams suitable for detection and segmentation, enabling strong performance without modifying the pre-trained ViT encoder \cite{chen2022vitadapter}. This adapter perspective frames ViT backbones as general-purpose encoders whose missing dense-prediction priors are supplied by compact necks. In the DETR setting, such adapters help stabilise cross-attention by providing scale-separated inputs, but they still inherit the fundamental question of cross-scale compatibility when the pyramid is derived from a single-resolution token lattice.
+
+\paragraph{Hierarchical multi-scale ViTs within DETR pipelines.}
+In parallel, hierarchical ViT backbones were developed to natively provide multi-scale features. Swin Transformer introduces shifted-window attention and stage-wise downsampling, producing a standard pyramid of progressively coarser maps, which aligns naturally with FPN or deformable attention based DETR variants \cite{liu2021swin,zhu2020deformable}. Pyramid Vision Transformers (PVT and PVTv2) similarly offer transformer-native pyramids, using spatial-reduction or linear-complexity attention to keep high-resolution stages efficient \cite{wang2021pvt,wang2021pvtv2}. When paired with DETR decoders (for example, Deformable DETR or DINO style training recipes), these hierarchical backbones improve small-object recall by maintaining higher-resolution semantic features in early stages and by simplifying the construction of multi-scale encoder inputs \cite{zhu2020deformable,zhang2022dino}. 
+
+Despite these advantages, the use of hierarchical ViTs introduces new design degrees of freedom. Window partitions, token merging strategies, and stage-wise positional encodings can create scale-dependent shifts that are benign for CNN necks but problematic for attention-based fusion, particularly when queries exploit precise geometric correspondence across feature levels \cite{liu2021swin,wang2021pvt}. This tension has motivated hybrid or reconfigured detector designs that explicitly coordinate backbone and decoder behaviour.
+
+\paragraph{Fully transformer-based DETRs.}
+Beyond backbone replacement, several detectors aim for an end-to-end transformer pipeline. ViDT integrates hierarchical ViTs directly into a DETR style detector by reconfiguring backbone attention to accommodate detection tokens and by pairing it with an efficient multi-scale decoder \cite{song2021vidt}. Such models reduce reliance on CNN necks while retaining hierarchical feature advantages, highlighting a broader trend toward pure transformer detection systems. However, they often remain dependent on carefully engineered multi-scale interaction modules, indicating that multi-scale reasoning is not automatically resolved by removing convolutions.
+
+% \paragraph{Open gaps and motivation for this thesis.}
+% Taken together, current ViT-based DETRs reveal two persistent gaps. First, efficient multi-scale fusion remains unresolved for plain or weakly hierarchical ViT backbones. Artificial pyramids and adapters enable scale diversity, but they do not guarantee cross-scale alignment or semantic compatibility, and attention-based fusion can amplify small misalignments into noticeable localisation errors for small objects. Second, even with hierarchical ViTs, stable cross-scale interaction is sensitive to how tokenisation, windowing, and stage transitions affect spatial correspondence, leaving DETR decoders to learn alignment implicitly \cite{li2022vitdet,liu2021swin,zhu2020deformable}. 
+
+% These limitations motivate the need for principled alignment and fusion mechanisms that preserve ViT generality while supporting robust multi-scale detection. The contributions in later chapters address these gaps by introducing explicit multi-scale alignment and fusion for ViT derived features (MCAF-DETR, Chapter~\ref{chap:mcaf-detr}) and by extending efficient cross-scale interaction into a latent bidirectional cross-attention formulation (BLCA, Chapter~\ref{chap:blca}). Together, they aim to retain the simplicity of end-to-end set prediction while improving small-object sensitivity, scale robustness, and computational practicality in modern DETR style detectors.
+
+\paragraph{Implications.}
+The survey of ViT-based detectors highlights unresolved questions about how to achieve stable, semantically aligned multi-scale representations when backbones differ in their inherent spatial structure. Plain ViTs rely on artificial pyramids or adapters, while hierarchical ViTs introduce scale-dependent shifts that complicate attention-based fusion. These persistent alignment and fusion challenges motivate a closer examination of how DETR architectures can better reconcile ViT features with multi-scale detection requirements.
+
+
+% \section{Explainability in Vision Transformers}
+% Introduce explainability techniques for deep models, contrasting earlier CNN-based attribution approaches with methods suited to transformers. Cover attention rollout, relevance propagation, gradient-based attribution, and attention-based interpretability tools. Summarise the limited existing literature on DETR-specific explainability and describe why interpretability is crucial for robustness analysis, diagnostic study, and principled architectural improvements.
+
+% \section{DETR Limitations in Practical Settings}
+% Describe the practical performance issues encountered when deploying DETR models outside controlled benchmarks. Discuss domain shift, scale imbalance, cluttered scenes, and the challenges of detecting small or visually subtle objects. Address compute and latency constraints, data requirements, and the opacity of DETR reasoning. Connect these limitations to the need for systematic analysis and architectural refinement.
+
+\section{DETR Limitations in Practical Settings}
+\label{sec:detr_practical_limitations}
+
+Although DETR and its descendants provide a conceptually clean alternative to anchor-based detectors, their deployment outside controlled benchmarks exposes a set of persistent limitations. These issues are not restricted to the original formulation, but recur across many modern variants, especially when operating under tight compute budgets, significant domain shift, and strong scale imbalance. This section summarises the main practical bottlenecks that motivate the diagnostic and architectural contributions of this thesis.
+
+\paragraph{Compute and latency constraints.}
+A primary barrier to practical adoption is the computational profile of transformer attention. Vanilla DETR applies dense self-attention over a flattened feature sequence, leading to quadratic complexity in the number of tokens and substantial memory overhead at high resolution \cite{carion2020detr}. In many real deployments, such as infrastructure inspection, aerial imagery, and other small-object regimes, the required input resolution is higher than that used in standard COCO training. Increasing resolution rapidly inflates token count and attention cost, producing a hard ceiling on feasible resolution during training and inference. Multi-scale variants such as Deformable DETR reduce theoretical complexity via sparse sampling across pyramid levels \cite{zhu2021deformabledetr}, and real-time designs such as RT-DETR further streamline the encoder to enable faster decoding \cite{lv2023rtdetr}. However, sparse attention introduces irregular memory access and sampling operations, so improvements in FLOPs do not always translate into proportional wall-clock speedups on typical GPUs or edge accelerators. As a result, transformer detectors tend to remain more demanding than optimised CNN baselines for comparable resolution and latency targets.
+
+\paragraph{Robustness under domain shift.}
+Controlled benchmarks often underestimate the distributional variability of real environments. DETR-style models have been reported to exhibit notable performance drops under common corruptions and adverse imaging conditions, including blur, noise, weather effects, and sensor artefacts \cite{detr_difficult_images2023}. This degradation can be amplified by the global coupling of attention, where spurious tokens may influence a large fraction of the feature field. In addition, the decoder relies on learned object queries whose statistics are shaped by the training domain, so shifts in appearance, scale distributions, or background context can destabilise matching and increase false positives. Recent domain generalisation efforts, for example DG-DETR, highlight that DETR architectures do not automatically yield domain-invariant representations without explicit regularisation or query adaptation \cite{dg_detr2025}. These observations motivate more systematic evaluation of DETR behaviour across domains, as pursued in Chapter~\ref{chap:road-damage}.
+
+\paragraph{Scale imbalance and small-object sensitivity.}
+Practical datasets often contain strong scale skew, with a long tail of small or visually subtle instances. Vanilla DETR is particularly sensitive to this setting because it operates on a single low-resolution feature map and aggregates information globally, which dilutes weak small-object signals in the encoder output \cite{carion2020detr}. Multi-scale deformable attention alleviates this by attending across feature levels, but sparse sampling introduces another failure mode: a query can miss a small object entirely if the initial reference points are misaligned, especially early in training \cite{zhu2021deformabledetr}. When paired with ViT backbones, the issue is compounded by patch tokenisation, where objects smaller than a patch may be summarised into mixed tokens without a mechanism to recover sub-patch geometry. Consequently, small-object recall remains a consistent weakness of DETR-style models in cluttered scenes and high-resolution deployments, motivating the alignment and fusion mechanisms developed in Chapter~\ref{chap:mcaf-detr}.
+
+\paragraph{Training stability and data requirements.}
+Another practical limitation is the training regime required to reach competitive performance. The original DETR formulation exhibits slow convergence, often needing long schedules to learn stable query assignment and spatial priors \cite{carion2020detr}. Later recipes such as DINO accelerate convergence using denoising queries and improved matching dynamics \cite{zhang2022dino}, but these gains still depend heavily on large-scale pretraining and carefully tuned optimisation. In small-data or long-tail domains, which are common in industrial and scientific applications, one-to-one matching can yield sparse positive supervision and unstable gradients for rare classes. This makes training DETR variants more sensitive to dataset size, class imbalance, and augmentation choices than many CNN detectors, reinforcing the need for targeted analysis and domain-specific adaptation.
+
+\paragraph{Opacity of reasoning and reliability.}
+Finally, DETR introduces interpretability and reliability challenges distinct from those of CNN detectors. While attention maps are often visualised as explanations, attention weights are not guaranteed to indicate causal contribution, and cross-attention may focus on correlated context rather than the object itself \cite{jain2019attentionnot,chefer2021transformerinterpretability}. This limits their utility for failure diagnosis in safety-critical settings. In addition, set prediction produces a fixed pool of predictions containing many unmatched ``no-object'' slots whose confidence calibration can be inconsistent. Recent work has shown that background predictions in transformer detectors may remain poorly calibrated relative to matched positives, complicating threshold selection in open-world deployments \cite{reliable_detr2024}. Chapter~\ref{chap:explainability} addresses these concerns by evaluating DETR explanations beyond raw attention visualisations and by analysing the stability of query-level evidence.
+
+% \paragraph{Implications.}
+% Taken together, these limitations show that DETR-like models, while elegant at the formulation level, still face substantive challenges in efficient multi-scale reasoning, practical robustness, and trustworthy interpretability. The remainder of this thesis responds directly to these gaps. Chapter~\ref{chap:road-damage} quantifies efficiency and generalisation issues in a real road-damage setting, Chapter~\ref{chap:explainability} studies the reliability of DETR explanations, and Chapters~\ref{chap:mcaf-detr} and~\ref{chap:blca} propose explicit alignment and fusion mechanisms to improve multi-scale performance under realistic constraints.
+
+\paragraph{Implications.}
+Overall, the limitations observed across compute efficiency, robustness, scale imbalance, training stability, and reliability indicate that DETR variants still struggle under practical deployment conditions. These recurring issues point toward the need for deeper diagnostic analysis of how DETR mechanisms behave under real-world variability and which architectural components contribute most to these behaviours.
+
+
+% \section{Summary and Thesis Positioning}
+% Synthesise the literature review by outlining the key gaps: inefficiencies in feature handling, insufficient multi-scale fusion strategies, and the lack of explainability studies for DETR models. Conclude by clearly positioning the thesis contributions, linking each upcoming chapter to the specific limitations identified in the literature, including the road damage case study, explainability analysis, MCAF-DETR, and BLCA.
+
+
+\section{Summary and Thesis Scope}
+
+This chapter has traced the progression of object detection from classical pipelines to fully attention-based systems, highlighting how modern detectors converge toward transformer architectures. Three overarching themes emerge across CNN-, ViT-, and DETR-based families:
+
+\begin{itemize}
+    \item \textbf{Inefficiencies in feature handling.} 
+    CNN backbones provide stable multi-scale pyramids but rely on handcrafted fusion operators. 
+    ViTs offer stronger global context yet weaken spatial precision and require artificial pyramids or adapters. 
+    Attention-based multi-scale mechanisms improve flexibility but depend on stable cross-scale correspondence.
+
+    \item \textbf{Unresolved challenges in multi-scale fusion and alignment.} 
+    Plain ViTs, hierarchical ViTs, and hybrid encoder designs differ substantially in where multi-scale structure is formed and how features interact across resolutions. 
+    Sparse attention improves efficiency, but misalignment across scales can degrade small-object recall and localisation accuracy. 
+    These issues are amplified when ViT-derived features are coupled with DETR decoders that require precise geometric correspondence.
+
+    \item \textbf{Limitations of DETR architectures in practical settings.}
+    Training stability, robustness under domain variation, small-object sensitivity, and interpretability all remain open challenges. 
+    One-to-one matching provides conceptual elegance but yields sparse supervision, making optimisation sensitive to dataset scale and class imbalance. 
+    Real-world corruptions, calibration issues, and opaque cross-attention behaviour further complicate deployment.
+\end{itemize}
+
+These themes collectively motivate the research directions undertaken in the remainder of this thesis:
+
+\begin{itemize}
+    \item \textbf{Chapter~\ref{chap:road-damage}} examines DETR behaviour under real-world variability using a road-damage case study, quantifying efficiency, generalisation, and scale-sensitive performance.
+    
+    \item \textbf{Chapter~\ref{chap:explainability}} conducts a detailed diagnostic analysis of DETR explanation mechanisms, evaluating cross-attention reliability, query stability, and calibration characteristics.
+    
+    \item \textbf{Chapter~\ref{chap:mcaf-detr}} introduces MCAF-DETR, which develops explicit multi-scale alignment and attention-based fusion methods tailored for ViT backbones.
+    
+    \item \textbf{Chapter~\ref{chap:blca}} extends these ideas through Bidirectional Latent Cross Attention (BLCA), a lightweight formulation that improves cross-scale compatibility and efficiency in DETR pipelines.
+\end{itemize}
+
+Together, these chapters respond to the limitations synthesised above and advance the broader objective of developing efficient, robust, and explainable DETR-style detectors suited for real-world deployment.
+

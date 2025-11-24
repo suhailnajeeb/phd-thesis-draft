@@ -1,2 +1,60 @@
 % Placeholder content for Chapter 1.
-\lipsum[1]
+% Chapter 1: Introduction
+% \lipsum[1]
+% =========================================================
+% Chapter 1: Introduction (Lean Draft)
+% =========================================================
+
+\chapter{Introduction}
+\label{ch:introduction}
+
+\section{Background and Problem Statement}
+Object detection is a central problem in computer vision, underpinning practical systems in domains such as transportation, infrastructure monitoring, robotics, and scene understanding. The task requires models to simultaneously recognise object categories and localise them precisely in complex visual environments. Over the past decade, detection performance has advanced rapidly through Convolutional Neural Networks (CNNs) and their multi-scale extensions, enabling strong results on benchmarks and early deployments in the real world. More recently, Vision Transformers (ViTs) and Detection Transformers (DETRs) have emerged as a new paradigm for object detection, offering global context modelling, simplified pipelines, and improved scalability compared to traditional region- or anchor-based detectors.
+
+Despite their promise, DETR-style detectors remain challenging to deploy in real-world settings. Existing variants often incur high computational cost, slower inference, and large data requirements, while exhibiting sensitivity to domain shift and inconsistent performance across object scales. These limitations become particularly pronounced when objects are small, visually subtle, or appear under cluttered or dynamically changing conditions. Consequently, there is a need to better understand the behaviours of DETR models in practice, and to develop architectures that are simultaneously robust, efficient, and explainable beyond controlled benchmark environments.
+
+\section{Motivation}
+This thesis is motivated by two converging observations. First, empirical evidence from real-world detection tasks suggests that ViT-based detectors can better represent fine-grained structure and subtle visual patterns than CNN-only pipelines, especially for small or irregular objects. However, directly integrating ViT backbones into multi-scale DETR encoders can substantially increase compute and memory costs, limiting their practicality in efficient or real-time settings. Second, while DETR architectures have grown rapidly in capability, their internal reasoning remains relatively opaque, and systematic explainability studies for DETR variants lag behind those for ViT classifiers. Without clear interpretability and diagnostic tools, architectural weaknesses are difficult to isolate, and design improvements are often guided by trial-and-error.
+
+Together, these observations motivate the central direction of this thesis: to develop \emph{pure Vision Transformer} detection architectures that fuse multi-scale ViT features efficiently, and to use explainability-driven analysis to uncover and address the limitations of Detection Transformers in real-world conditions.
+
+\section{Research Objectives and Questions}
+The overarching objective of this research is to investigate the limitations of Detection Transformers in practice, and to design efficient and explainable ViT-based DETR architectures that generalise robustly across diverse environments. Specifically, this thesis addresses the following research questions:
+
+\begin{itemize}
+    \item \textbf{RQ1:} What specific challenges do Detection Transformers face in practical applications, particularly regarding real-time processing constraints, varying object scales, and generalisation under domain shift?
+    \item \textbf{RQ2:} How can explainability techniques be applied to systematically uncover the decision-making process and identify architectural limitations of Detection Transformers across diverse environments?
+    \item \textbf{RQ3:} What architectural modifications can be introduced to Detection Transformers to improve robustness, efficiency, and explainability, especially for multi-scale and small-object detection under real-world conditions?
+\end{itemize}
+
+\section{Thesis Contributions}
+This thesis makes the following contributions toward efficient and explainable ViT-based object detection:
+
+\begin{itemize}
+    \item \textbf{Real-world empirical motivation:} A comprehensive case study on automated road damage detection evaluates CNN and DETR families under domain shift and scale imbalance, demonstrating the potential of ViT-based DETRs for fine-grained and small-object detection.
+    \item \textbf{Explainability-driven analysis:} A detailed deconstruction of DETR, Deformable-DETR, and DINO reveals consistent reasoning patterns, attention behaviours, and failure modes, establishing explainability as a diagnostic tool for detector design.
+    \item \textbf{ViT-friendly multi-scale fusion:} The proposed \textbf{MCAF-DETR} architecture introduces a multi-scale deformable cross-attention encoder for efficient fusion of hierarchical ViT features, enabling strong multi-scale detection without heavy self-attention encoders.
+    \item \textbf{Latent-space decoding for efficiency (forward-looking):} The \textbf{BLCA} framework explores a compact latent workspace for bidirectional query–feature interaction, reducing decoder cost while preserving global–local reasoning capacity.
+    \item \textbf{A unified perspective on robust transformer detection:} The thesis consolidates empirical findings and architectural insights into practical guidelines for building efficient, explainable Detection Transformers with pure ViT backbones.
+\end{itemize}
+
+\section{Thesis Organisation}
+The remainder of this thesis is structured into seven chapters.
+
+\textbf{Chapter~2} surveys object detection foundations, tracing the evolution from CNN-based detectors to ViT and DETR families. It reviews multi-scale modelling strategies and explainability methods that underpin later chapters.
+
+\textbf{Chapter~3} presents a real-world case study on automated road damage detection. Through extensive evaluation across datasets and detector families, it highlights practical challenges in scale imbalance, annotation inconsistency, and domain shift, and motivates ViT-based DETR designs.
+
+\textbf{Chapter~4} provides a comprehensive explainability and failure-case analysis of DETR variants, including Deformable-DETR and DINO. It examines encoder–decoder attention, reference-point dynamics, and scale-dependent errors to identify core architectural limitations.
+
+\textbf{Chapter~5} introduces \textbf{MCAF-DETR}, a ViT-friendly Detection Transformer that replaces CNN feature pyramids with multi-scale deformable cross-attention. The chapter details the architecture, training, and evaluation on MS COCO, demonstrating improved robustness and competitive efficiency.
+
+\textbf{Chapter~6} (optional) proposes \textbf{Bidirectional Latent Cross Attention (BLCA)}, a forward-looking latent-driven decoder framework for efficient DETR-style detection. It outlines the design rationale and early empirical results, and positions the approach for future extension.
+
+Finally, \textbf{Chapter~7} concludes the thesis by summarising key findings, reflecting on limitations, and outlining future research directions for efficient and explainable Vision Transformer detectors.
+
+% =========================================================
+% End of Chapter 1 draft
+% =========================================================
+
+% TODO: Add References / citations
