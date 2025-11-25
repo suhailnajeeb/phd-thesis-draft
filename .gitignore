@@ -13,3 +13,6 @@
 *.synctex.gz
 *.run.xml
 *.pdf
+!figs/*.pdf
+!figs/**/*.pdf
+/main.pdf
